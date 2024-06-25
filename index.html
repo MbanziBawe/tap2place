@@ -1,52 +1,128 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Application with Three.js</title>
-    <script src="https://unpkg.com/three@0.126.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
-    <style>
-        body { margin: 0; }
-        canvas { display: block; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <title>Tap to Place AR Demo</title>
+
+  <!-- three.js -->
+  <script src="https://unpkg.com/three@0.126.0/build/three.js"></script>
 </head>
 <body>
-    <script>
-        // Initialize Three.js components
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
 
-        // Create a light
-        const light = new THREE.AmbientLight(0xffffff); // soft white light
-        scene.add(light);
+<!-- Starting an immersive WebXR session requires user interaction.
+    We start this one with a simple button. -->
+<button onclick="activateXR()">Start AR</button>
 
-        // Create a GLTF loader
-        const loader = new THREE.GLTFLoader();
-        loader.load(
-            'trees.glb',
-            function (gltf) {
-                const model = gltf.scene;
-                scene.add(model);
-            },
-            undefined,
-            function (error) {
-                console.error(error);
+<script>
+  async function activateXR() {
+    // Add a canvas element and initialize a WebGL context that is compatible with WebXR.
+    const canvas = document.createElement("canvas");
+    document.body.appendChild(canvas);
+    const gl = canvas.getContext("webgl", {xrCompatible: true});
+
+    // Create a scene.
+    const scene = new THREE.Scene();
+
+    // Initialize a WebXR session using "immersive-ar".
+    const session = await navigator.xr.requestSession("immersive-ar");
+    session.updateRenderState({
+      baseLayer: new XRWebGLLayer(session, gl)
+    });
+
+    // A 'local' reference space has a native origin that is located
+    // near the viewer's position at the time the session was created.
+    const referenceSpace = await session.requestReferenceSpace('local');
+
+    // Set up the WebGLRenderer, which handles rendering to the session's base layer.
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      preserveDrawingBuffer: true,
+      canvas: canvas,
+      context: gl
+    });
+    renderer.autoClear = false;
+
+    // The API directly updates the camera matrices.
+    // Disable matrix auto updates so three.js doesn't attempt
+    // to handle the matrices independently.
+    const camera = new THREE.PerspectiveCamera();
+    camera.matrixAutoUpdate = false;
+
+    // Load your GLTF model (trees.glb)
+    const loader = new THREE.GLTFLoader();
+    loader.load(
+      'trees.glb',
+      function (gltf) {
+        // Once loaded, position the model in the scene
+        const model = gltf.scene;
+        scene.add(model);
+
+        // Optional: Scale and position the model as needed
+        model.scale.set(0.1, 0.1, 0.1); // Adjust scale if necessary
+        model.position.set(0, 0, -1); // Adjust position if necessary
+      },
+      undefined,
+      function (error) {
+        console.error(error);
+      }
+    );
+
+    // Create a render loop that allows us to draw on the AR view.
+    const onXRFrame = (time, frame) => {
+      // Queue up the next draw request.
+      session.requestAnimationFrame(onXRFrame);
+
+      // Bind the graphics framebuffer to the baseLayer's framebuffer
+      gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer);
+
+      // Retrieve the pose of the device.
+      // XRFrame.getViewerPose can return null while the session attempts to establish tracking.
+      const pose = frame.getViewerPose(referenceSpace);
+      if (pose) {
+        // In mobile AR, we only have one view.
+        const view = pose.views[0];
+
+        const viewport = session.renderState.baseLayer.getViewport(view);
+        renderer.setSize(viewport.width, viewport.height);
+
+        // Use the view's transform matrix and projection matrix to configure the THREE.camera.
+        camera.matrix.fromArray(view.transform.matrix);
+        camera.projectionMatrix.fromArray(view.projectionMatrix);
+        camera.updateMatrixWorld(true);
+
+        // Render the scene with THREE.WebGLRenderer.
+        renderer.render(scene, camera);
+      }
+    };
+
+    // Add event listener for tap to place functionality
+    canvas.addEventListener('click', function (event) {
+      // Check if session is supported and active
+      if (session) {
+        // Place an object at the intersection of the screen tap in AR
+        const hitTestSource = session.requestHitTestSource({ space: referenceSpace });
+        hitTestSource.then(hitTest => {
+          session.requestAnimationFrame(() => {
+            // Perform hit testing
+            const hitResults = hitTest.getHitTestResults(event);
+            if (hitResults.length > 0) {
+              const pose = hitResults[0].getPose(referenceSpace);
+              // Place object (model) at hit test pose
+              if (pose) {
+                model.position.copy(pose.transform.position);
+              }
             }
-        );
+          });
+        });
+      }
+    });
 
-        // Position the camera
-        camera.position.z = 5;
+    // Start rendering the scene
+    session.requestAnimationFrame(onXRFrame);
+  }
+</script>
 
-        // Render loop
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
-        animate();
-    </script>
 </body>
 </html>
