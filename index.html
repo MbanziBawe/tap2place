@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Application with Three.js</title>
+    <script src="https://unpkg.com/three@0.126.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script>
+        // Initialize Three.js components
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Create a light
+        const light = new THREE.AmbientLight(0xffffff); // soft white light
+        scene.add(light);
+
+        // Create a GLTF loader
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+            'trees.glb',
+            function (gltf) {
+                const model = gltf.scene;
+                scene.add(model);
+            },
+            undefined,
+            function (error) {
+                console.error(error);
+            }
+        );
+
+        // Position the camera
+        camera.position.z = 5;
+
+        // Render loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
