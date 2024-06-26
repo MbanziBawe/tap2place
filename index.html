@@ -72,13 +72,13 @@
         scene.add(reticle);
       })
 
-      let flower;
+      let lamp;
       loader.load("https://vazxmixjsiawhamofees.supabase.co/storage/v1/object/public/models/lamp-post/model.gltf", function (gltf) {
         flower = gltf.scene;
       });
 
       session.addEventListener("select", (event) => {
-        if (flower) {
+        if (lamp) {
           const clone = flower.clone();
           clone.position.copy(reticle.position);
           scene.add(clone);
