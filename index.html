@@ -74,12 +74,12 @@
 
       let lamp;
       loader.load("https://vazxmixjsiawhamofees.supabase.co/storage/v1/object/public/models/lamp-post/model.gltf", function (gltf) {
-        flower = gltf.scene;
+        lamp = gltf.scene;
       });
 
       session.addEventListener("select", (event) => {
         if (lamp) {
-          const clone = flower.clone();
+          const clone = lamp.clone();
           clone.position.copy(reticle.position);
           scene.add(clone);
         }
